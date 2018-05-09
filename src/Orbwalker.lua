@@ -1197,7 +1197,10 @@ class "__Utilities"
 			["XenZhaoThrust3"] = true,
 			["BlueCardPreAttack"] = true,
 			["RedCardPreAttack"] = true,
-			["GoldCardPreAttack"] = true
+			["GoldCardPreAttack"] = true,
+			["ViktorQBuff"] = true,
+			["MasterYiDoubleStrike"] = true,
+			["QuinnWEnhanced"] = true,
 		};
 		
 		self.NoAutoAttacks = {
@@ -1701,8 +1704,20 @@ class "__ObjectManager"
 				end
 			end
 		end
+		
+		self.IgnoredMinions = {};
 	end
 
+
+	--Used for a script to manually ignore a minion for last hitting.
+		--EG: Cass has already E'd the minion and will kill it, don't try to auto attack that same minion
+	function __ObjectManager:IgnoreMinion(networkID, expiration)
+		if not expiration then
+			expiration = GetTickCount() + 1000
+		end
+		self.IgnoredMinions[networkID] = expiration
+	end
+	
 	function __ObjectManager:GetMinionType(minion)
 		if Utilities:IsMonster(minion) then
 			return MINION_TYPE_MONSTER;
@@ -1743,7 +1758,7 @@ class "__ObjectManager"
 		local result = {};
 		for i = 1, LocalGameMinionCount() do
 			local minion = LocalGameMinion(i);
-			if Utilities:IsValidTarget(minion) and minion.isEnemy and self:GetMinionType(minion) == MINION_TYPE_LANE_MINION then
+			if Utilities:IsValidTarget(minion) and minion.isEnemy and self:GetMinionType(minion) == MINION_TYPE_LANE_MINION and (self.IgnoredMinions[minion.networkID] == nil or GetTickCount() > self.IgnoredMinions[minion.networkID]) then
 				if Utilities:IsInRange(myHero, minion, range) then
 					Linq:Add(result, minion);
 				end
@@ -1756,7 +1771,7 @@ class "__ObjectManager"
 		local result = {};
 		for i = 1, LocalGameMinionCount() do
 			local minion = LocalGameMinion(i);
-			if Utilities:IsValidTarget(minion) and minion.isEnemy and self:GetMinionType(minion) == MINION_TYPE_LANE_MINION then
+			if Utilities:IsValidTarget(minion) and minion.isEnemy and self:GetMinionType(minion) == MINION_TYPE_LANE_MINION and (self.IgnoredMinions[minion.networkID] == nil or GetTickCount() > self.IgnoredMinions[minion.networkID]) then
 				if Utilities:IsInAutoAttackRange(myHero, minion) then
 					Linq:Add(result, minion);
 				end
@@ -2854,6 +2869,8 @@ class "__Orbwalker"
 					end
 				end
 				if (not SupportMode) or (BuffManager:GetBuffCount(myHero, "TalentReaper") > 0) then
+					--List of ignore minions that champion scripts have already cast skill on.
+					
 					if self.LastHitMinion ~= nil then
 						if self.AlmostLastHitMinion ~= nil and not Utilities:IdEquals(self.AlmostLastHitMinion, self.LastHitMinion) and Utilities:IsSiegeMinion(self.AlmostLastHitMinion) then
 							return nil;
@@ -3636,7 +3653,7 @@ class "__Orbwalker"
 			[ORBWALKER_MODE_FLEE] 			= self:HasMode(ORBWALKER_MODE_FLEE),
 		};
 	end
-
+	
 	function __Orbwalker:CalculateLastHittableMinions()
 		local allyTurrets = ObjectManager:GetAllyTurrets();
 		local nearestTurret = nil;
